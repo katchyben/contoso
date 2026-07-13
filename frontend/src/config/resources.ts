@@ -104,6 +104,7 @@ export const resources: ResourceConfig[] = [
       { key: 'unit_price', label: 'Unit price', type: 'decimal', required: true },
       { key: 'stock_quantity', label: 'Stock quantity', type: 'number', default: 0 },
       { key: 'is_active', label: 'Active', type: 'boolean', default: true },
+      { key: 'image_url', label: 'Image URL', type: 'string' },
       { key: 'category_id', label: 'Category ID', type: 'number' },
     ],
   },

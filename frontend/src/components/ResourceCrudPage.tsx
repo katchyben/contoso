@@ -31,6 +31,7 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import { api } from '../api/client'
 import type { FieldConfig, ResourceConfig } from '../config/resources'
 import { styleForStatus } from '../config/statusStyles'
+import { useAuth } from '../auth/AuthContext'
 
 type Row = Record<string, unknown>
 type DialogMode = 'create' | 'edit'
@@ -133,6 +134,8 @@ function buildPayload(fields: FieldConfig[], mode: DialogMode, formState: Record
 }
 
 export function ResourceCrudPage({ resource }: { resource: ResourceConfig }) {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -294,9 +297,11 @@ export function ResourceCrudPage({ resource }: { resource: ResourceConfig }) {
                     <IconButton size="small" onClick={() => openEdit(row)} aria-label="edit">
                       <EditIcon fontSize="small" />
                     </IconButton>
-                    <IconButton size="small" onClick={() => setDeleteTarget(row)} aria-label="delete">
-                      <DeleteIcon fontSize="small" />
-                    </IconButton>
+                    {isAdmin && (
+                      <IconButton size="small" onClick={() => setDeleteTarget(row)} aria-label="delete">
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
