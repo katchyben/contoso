@@ -2,7 +2,7 @@ import os
 
 from sqlmodel import Session, SQLModel, create_engine
 
-import models  # noqa: F401  registers tables on SQLModel.metadata
+from app import models  # noqa: F401  registers tables on SQLModel.metadata
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", "postgresql+psycopg://postgres:postgres@localhost:5432/contoso"

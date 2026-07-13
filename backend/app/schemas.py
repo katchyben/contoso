@@ -3,7 +3,20 @@ from decimal import Decimal
 
 from sqlmodel import SQLModel
 
-from models import AddressType, OrderStatus, PaymentStatus, ShipmentStatus
+from app.models import AddressType, OrderStatus, PaymentStatus, ShipmentStatus, UserRole
+
+
+class Token(SQLModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UserRead(SQLModel):
+    id: int
+    email: str
+    full_name: str
+    role: UserRole
+    is_active: bool
 
 
 class CustomerCreate(SQLModel):
@@ -88,6 +101,7 @@ class ProductCreate(SQLModel):
     unit_price: Decimal
     stock_quantity: int = 0
     is_active: bool = True
+    image_url: str | None = None
     category_id: int | None = None
 
 
@@ -98,6 +112,7 @@ class ProductUpdate(SQLModel):
     unit_price: Decimal | None = None
     stock_quantity: int | None = None
     is_active: bool | None = None
+    image_url: str | None = None
     category_id: int | None = None
 
 
@@ -109,6 +124,7 @@ class ProductRead(SQLModel):
     unit_price: Decimal
     stock_quantity: int
     is_active: bool
+    image_url: str | None
     category_id: int | None
 
 
@@ -173,6 +189,38 @@ class OrderItemRead(SQLModel):
     quantity: int
     unit_price: Decimal
     total_price: Decimal
+
+
+class OrderDetailRead(OrderRead):
+    items: list[OrderItemRead]
+
+
+class RegisterRequest(SQLModel):
+    email: str
+    password: str
+    first_name: str
+    last_name: str
+    phone: str | None = None
+
+
+class CheckoutAddressInput(SQLModel):
+    line1: str
+    line2: str | None = None
+    city: str
+    state: str | None = None
+    postal_code: str
+    country: str
+
+
+class CheckoutLineItem(SQLModel):
+    product_id: int
+    quantity: int
+
+
+class CheckoutRequest(SQLModel):
+    shipping_address: CheckoutAddressInput
+    billing_address: CheckoutAddressInput | None = None
+    items: list[CheckoutLineItem]
 
 
 class PaymentCreate(SQLModel):

@@ -9,8 +9,9 @@ from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy import text
 from sqlmodel import Session
 
-from database import create_db_and_tables, engine
-from models import (
+from app.core.security import hash_password
+from app.database import create_db_and_tables, engine
+from app.models import (
     Address,
     AddressType,
     Category,
@@ -23,6 +24,8 @@ from models import (
     Product,
     Shipment,
     ShipmentStatus,
+    User,
+    UserRole,
 )
 
 TAX_RATE = Decimal("0.08")
@@ -38,7 +41,40 @@ def clear_data(session: Session) -> None:
     session.execute(
         text(
             "TRUNCATE TABLE shipments, payments, order_items, orders, "
-            "addresses, products, categories, customers RESTART IDENTITY CASCADE"
+            "addresses, products, categories, customers, users RESTART IDENTITY CASCADE"
+        )
+    )
+    session.commit()
+
+
+def seed_users(session: Session) -> None:
+    session.add_all(
+        [
+            User(
+                email="admin@contoso.local",
+                hashed_password=hash_password("admin123"),
+                full_name="Ada Administrator",
+                role=UserRole.ADMIN,
+            ),
+            User(
+                email="staff@contoso.local",
+                hashed_password=hash_password("staff123"),
+                full_name="Sam Staff",
+                role=UserRole.STAFF,
+            ),
+        ]
+    )
+    session.commit()
+
+
+def seed_customer_login(session: Session, customer: Customer) -> None:
+    session.add(
+        User(
+            email=customer.email,
+            hashed_password=hash_password("customer123"),
+            full_name=f"{customer.first_name} {customer.last_name}",
+            role=UserRole.CUSTOMER,
+            customer_id=customer.id,
         )
     )
     session.commit()
@@ -140,47 +176,64 @@ def seed_categories(session: Session) -> dict[str, Category]:
     }
 
 
+def image_for(keyword: str, lock: int) -> str:
+    # Real, keyword-matched photos via LoremFlickr (searches tagged Flickr
+    # photos). `lock` pins a specific photo so it stays stable across reloads
+    # instead of returning a new random match each time.
+    return f"https://loremflickr.com/480/360/{keyword}?lock={lock}"
+
+
 def seed_products(session: Session, categories: dict[str, Category]) -> dict[str, Product]:
     products = {
         "ultrabook": Product(
             sku="LAP-ULT-14", name="UltraBook 14", description="14-inch ultraportable laptop",
             unit_price=Decimal("1299.99"), stock_quantity=25, category_id=categories["laptops"].id,
+            image_url=image_for("laptop", 101),
         ),
         "probook": Product(
             sku="LAP-PRO-16", name="ProBook 16", description="16-inch workstation laptop",
             unit_price=Decimal("1599.00"), stock_quantity=15, category_id=categories["laptops"].id,
+            image_url=image_for("laptop-computer", 1),
         ),
         "pixel_nova": Product(
             sku="PHN-NOVA", name="Pixel Nova", description="Flagship smartphone",
             unit_price=Decimal("899.00"), stock_quantity=40, category_id=categories["phones"].id,
+            image_url=image_for("smartphone", 6),
         ),
         "iris_phone": Product(
             sku="PHN-IRIS-12", name="Iris Phone 12", description="Mid-range smartphone",
             unit_price=Decimal("649.99"), stock_quantity=60, category_id=categories["phones"].id,
+            image_url=image_for("touchscreen-phone", 1),
         ),
         "wireless_mouse": Product(
             sku="ACC-MOU-01", name="Wireless Mouse", description="Ergonomic wireless mouse",
             unit_price=Decimal("29.99"), stock_quantity=200, category_id=categories["accessories"].id,
+            image_url=image_for("computer-mouse", 105),
         ),
         "usb_hub": Product(
             sku="ACC-HUB-01", name="USB-C Hub", description="7-in-1 USB-C hub",
             unit_price=Decimal("45.50"), stock_quantity=150, category_id=categories["accessories"].id,
+            image_url=image_for("usb-cable", 1),
         ),
         "frypan": Product(
             sku="CKW-FRY-10", name='NonStick Frypan 10"', description="10-inch nonstick frypan",
             unit_price=Decimal("34.99"), stock_quantity=80, category_id=categories["cookware"].id,
+            image_url=image_for("frying-pan", 107),
         ),
         "pot_set": Product(
             sku="CKW-POT-SET", name="Stainless Steel Pot Set", description="5-piece pot and pan set",
             unit_price=Decimal("129.99"), stock_quantity=30, category_id=categories["cookware"].id,
+            image_url=image_for("saucepan", 1),
         ),
         "baking_mat": Product(
             sku="BAK-MAT-01", name="Silicone Baking Mat", description="Non-stick silicone baking mat",
             unit_price=Decimal("19.99"), stock_quantity=100, category_id=categories["bakeware"].id,
+            image_url=image_for("baking-mat", 1),
         ),
         "muffin_tin": Product(
             sku="BAK-TIN-12", name="Muffin Tin 12-cup", description="Non-stick 12-cup muffin tin",
             unit_price=Decimal("14.99"), stock_quantity=90, category_id=categories["bakeware"].id,
+            image_url=image_for("muffin-pan", 1),
         ),
     }
     session.add_all(products.values())
@@ -348,8 +401,14 @@ def main() -> None:
         print("Clearing existing data...")
         clear_data(session)
 
+        print("Seeding users...")
+        seed_users(session)
+
         print("Seeding customers...")
         customers = seed_customers(session)
+
+        print("Seeding customer login (ada.lovelace@example.com / customer123)...")
+        seed_customer_login(session, customers[0])
 
         print("Seeding addresses...")
         addresses = seed_addresses(session, customers)
