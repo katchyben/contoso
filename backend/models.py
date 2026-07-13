@@ -1,11 +1,13 @@
-from __future__ import annotations
-
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import Column, DateTime, Enum as SAEnum, Numeric, UniqueConstraint, func
 from sqlmodel import Field, Relationship, SQLModel
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class AddressType(str, enum.Enum):
@@ -48,7 +50,8 @@ class Customer(SQLModel, table=True):
     last_name: str = Field(max_length=100)
     phone: str | None = Field(default=None, max_length=30)
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+        default_factory=utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
     )
 
     addresses: list["Address"] = Relationship(
@@ -124,10 +127,12 @@ class Order(SQLModel, table=True):
     total_amount: Decimal = Field(sa_column=Column(Numeric(10, 2), nullable=False))
     currency: str = Field(default="USD", max_length=3)
     placed_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+        default_factory=utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
     )
     updated_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+        default_factory=utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
     )
 
     customer: Customer = Relationship(back_populates="orders")
@@ -174,7 +179,8 @@ class Payment(SQLModel, table=True):
     provider: str = Field(max_length=50)  # e.g. "stripe", "paypal"
     provider_reference: str | None = Field(default=None, max_length=255)
     created_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), server_default=func.now())
+        default_factory=utcnow,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
     )
 
     order: Order = Relationship(back_populates="payments")
