@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import bcrypt
 import jwt
 
-SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "dev-secret-change-me")
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "dev-secret-change-me-before-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8
 
