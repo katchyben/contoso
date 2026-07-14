@@ -17,7 +17,7 @@ cd backend && uv sync
 
 Run the dev server (auto-reload):
 ```
-cd backend && uv run uvicorn main:app --reload
+cd backend && uv run uvicorn app.main:app --reload
 ```
 
 Listens on `http://127.0.0.1:8000` by default. `test_main.http` contains sample requests for the existing endpoints (`/` and `/hello/{name}`) — usable directly from an editor with an HTTP client plugin, or as a reference for `curl`.
