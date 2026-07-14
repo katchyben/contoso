@@ -24,7 +24,29 @@ Listens on `http://127.0.0.1:8000` by default. `test_main.http` contains sample 
 
 CORS is enabled for any `http://localhost:<port>` / `http://127.0.0.1:<port>` origin (see `allow_origin_regex` in `main.py`), so the frontend dev server can call it regardless of which port Vite picks.
 
-There is no test suite, linter, or formatter configured yet.
+Config is loaded from `backend/.env` (via `python-dotenv`, wired up in `app/__init__.py`); see `backend/.env.example` for the variables it reads (`DATABASE_URL`, `JWT_SECRET_KEY`, `GOOGLE_API_KEY`).
+
+Backend has a pytest suite (`backend/tests/`) covering services, repositories, and routers (incl. the `/ws/chat` websocket) against an in-memory SQLite DB — no external services needed:
+```
+cd backend && uv run pytest
+```
+
+There is no linter or formatter configured yet.
+
+## End-to-end tests (`e2e/`)
+
+Playwright-based (Python) browser tests that drive the real frontend + backend + Postgres together, via this project's `docker-compose.yml`. Separate `uv` project from `backend/` since it has its own dependency set (`playwright`, `pytest-playwright`).
+
+```
+docker compose up -d                                            # from repo root: db + backend + frontend
+cd backend && DATABASE_URL="postgresql+psycopg://postgres:postgres@localhost:5433/contoso" uv run python seed.py
+cd e2e && uv sync && uv run playwright install chromium          # one-time setup
+uv run pytest
+```
+
+Tests assume the seeded fixture logins from `backend/seed.py` (`ada.lovelace@example.com` / `customer123`, `admin@contoso.local` / `admin123`). The chat widget test tolerates either a real Gemini reply or the graceful fallback message — it doesn't require a working `GOOGLE_API_KEY`, since it only asserts that *some* assistant reply arrives.
+
+If you've changed `backend/pyproject.toml` since the backend container was last built, its `.venv` (an anonymous Docker volume, isolated from `backend/.venv` on the host) can go stale and crash-loop on missing imports. Fix with `docker compose exec backend uv sync --locked` followed by `docker compose restart backend`, or `docker compose build backend` if you have registry access.
 
 ## Frontend (`frontend/`)
 

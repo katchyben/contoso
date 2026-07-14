@@ -3,6 +3,7 @@ import { AppBar, Badge, Box, Button, Container, Toolbar, Typography } from '@mui
 import ShoppingCartOutlined from '@mui/icons-material/ShoppingCartOutlined'
 import { useAuth } from '../auth/AuthContext'
 import { useCart } from './CartContext'
+import { ChatWidget } from './ChatWidget'
 
 function BrandMark() {
   return (
@@ -81,6 +82,8 @@ export function ShopLayout() {
       <Container maxWidth="lg" sx={{ py: 4, flexGrow: 1 }}>
         <Outlet />
       </Container>
+
+      {isCustomer && <ChatWidget />}
     </Box>
   )
 }

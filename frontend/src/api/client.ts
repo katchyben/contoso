@@ -1,6 +1,6 @@
 import { clearToken, getToken } from '../auth/authStore'
 
-const API_BASE = 'http://127.0.0.1:8000'
+export const API_BASE: string = import.meta.env.VITE_API_BASE || 'http://127.0.0.1:8000'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getToken()
