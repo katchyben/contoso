@@ -1,0 +1,115 @@
+---
+- name: Look up the default VPC (used when vpc_id isn't set)
+  amazon.aws.ec2_vpc_net_info:
+    profile: "{{ aws_profile | default(omit) }}"
+    region: "{{ aws_region }}"
+    filters:
+      isDefault: "true"
+  register: default_vpc
+  when: vpc_id | length == 0
+
+- name: Set the effective VPC id
+  ansible.builtin.set_fact:
+    effective_vpc_id: "{{ vpc_id if vpc_id | length > 0 else default_vpc.vpcs[0].id }}"
+
+- name: Look up a subnet in that VPC (used when vpc_subnet_id isn't set)
+  amazon.aws.ec2_vpc_subnet_info:
+    profile: "{{ aws_profile | default(omit) }}"
+    region: "{{ aws_region }}"
+    filters:
+      vpc-id: "{{ effective_vpc_id }}"
+  register: vpc_subnets
+  when: vpc_subnet_id | length == 0
+
+- name: Set the effective subnet id
+  ansible.builtin.set_fact:
+    effective_subnet_id: "{{ vpc_subnet_id if vpc_subnet_id | length > 0 else vpc_subnets.subnets[0].id }}"
+
+- name: Find the latest matching Ubuntu AMI
+  amazon.aws.ec2_ami_info:
+    profile: "{{ aws_profile | default(omit) }}"
+    region: "{{ aws_region }}"
+    owners:
+      - "{{ ami_owner }}"
+    filters:
+      name: "{{ ami_name_filter }}"
+      state: available
+  register: ami_search
+
+- name: Pick the most recently created AMI
+  ansible.builtin.set_fact:
+    chosen_ami: "{{ (ami_search.images | sort(attribute='creation_date') | last) }}"
+
+- name: Create the security group (SSH restricted to admin_cidr; HTTP/HTTPS open)
+  amazon.aws.ec2_security_group:
+    profile: "{{ aws_profile | default(omit) }}"
+    region: "{{ aws_region }}"
+    name: "{{ project_name }}-web-sg"
+    description: "{{ project_name }}: SSH (restricted) + HTTP/HTTPS for the FastAPI/Nginx host"
+    vpc_id: "{{ effective_vpc_id }}"
+    rules:
+      - proto: tcp
+        ports: [22]
+        cidr_ip: "{{ admin_cidr }}"
+        rule_desc: SSH from the admin CIDR only
+      - proto: tcp
+        ports: [80]
+        cidr_ip: 0.0.0.0/0
+        rule_desc: HTTP
+      - proto: tcp
+        ports: [443]
+        cidr_ip: 0.0.0.0/0
+        rule_desc: HTTPS
+    rules_egress:
+      - proto: -1
+        cidr_ip: 0.0.0.0/0
+        rule_desc: allow all outbound
+    tags:
+      Project: "{{ project_name }}"
+  register: web_sg
+
+- name: Launch (or reuse) the EC2 instance
+  amazon.aws.ec2_instance:
+    profile: "{{ aws_profile | default(omit) }}"
+    region: "{{ aws_region }}"
+    name: "{{ project_name }}-prod"
+    image_id: "{{ chosen_ami.image_id }}"
+    instance_type: "{{ instance_type }}"
+    key_name: "{{ key_name }}"
+    vpc_subnet_id: "{{ effective_subnet_id }}"
+    security_group: "{{ web_sg.group_id }}"
+    network:
+      assign_public_ip: true
+    volumes:
+      - device_name: /dev/sda1
+        ebs:
+          volume_size: "{{ root_volume_size_gb }}"
+          volume_type: gp3
+          delete_on_termination: true
+    tags:
+      Project: "{{ project_name }}"
+      Role: web
+    state: started
+    wait: true
+  register: ec2_result
+
+- name: Wait for SSH to come up
+  ansible.builtin.wait_for:
+    host: "{{ ec2_result.instances[0].public_ip_address }}"
+    port: 22
+    delay: 10
+    timeout: 300
+
+- name: Record the instance under [web] in inventory/hosts.ini
+  ansible.builtin.blockinfile:
+    path: "{{ playbook_dir }}/inventory/hosts.ini"
+    marker: "# {mark} ANSIBLE MANAGED — provision.yml"
+    insertafter: "^\\[web\\]"
+    block: |
+      {{ project_name }}-prod ansible_host={{ ec2_result.instances[0].public_ip_address }} ansible_user={{ ssh_user }} ansible_ssh_private_key_file={{ ssh_private_key_file }}
+
+- name: Show the new instance
+  ansible.builtin.debug:
+    msg: >-
+      {{ project_name }}-prod is up at {{ ec2_result.instances[0].public_ip_address }}
+      (added to inventory/hosts.ini under [web]). Next: ansible-playbook site.yml

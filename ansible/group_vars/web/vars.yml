@@ -1,0 +1,32 @@
+---
+app_user: contoso
+app_group: contoso
+app_dir: /opt/contoso
+
+repo_url: git@github.com:your-org/contoso.git
+repo_version: main
+# Set to a path readable by app_user if repo_url is a private SSH remote (deploy key).
+git_ssh_key_src: ""
+
+domain_name: shop.example.com
+enable_tls: false # flip to true once DNS points at this host, then re-run to get a cert
+letsencrypt_email: ops@example.com
+
+backend_port: 8000
+backend_workers: 3
+
+node_major_version: "20"
+
+# RDS Postgres and the S3 bucket are provisioned outside this playbook
+# (Terraform/console/etc). Only their connection details live here.
+database_url: "postgresql+psycopg://{{ vault_db_user }}:{{ vault_db_password }}@{{ vault_db_host }}:5432/{{ vault_db_name }}"
+
+# Real AWS S3 (no S3_ENDPOINT_URL, no static keys — the EC2 instance role
+# supplies credentials via boto3's default credential chain). The instance's
+# IAM role/profile must grant s3:PutObject/GetObject on this bucket.
+s3_bucket: contoso-images
+s3_region: us-east-1
+s3_public_url_base: "https://{{ s3_bucket }}.s3.{{ s3_region }}.amazonaws.com"
+
+jwt_secret_key: "{{ vault_jwt_secret_key }}"
+google_api_key: "{{ vault_google_api_key | default('') }}"

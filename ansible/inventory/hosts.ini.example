@@ -1,0 +1,13 @@
+# Copy to hosts.ini.
+#
+# [provisioners] drives provision.yml (creates the security group + EC2
+# instance from your machine, via the AWS API — no SSH needed for this part).
+# provision.yml then appends the new instance under [web] itself, so you
+# normally shouldn't need to hand-edit that block; it's just here so site.yml
+# has somewhere to find hosts if you'd rather point it at an instance you
+# provisioned some other way.
+[provisioners]
+localhost ansible_connection=local
+
+[web]
+# populated automatically by `ansible-playbook provision.yml`

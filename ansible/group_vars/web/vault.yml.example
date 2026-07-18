@@ -1,0 +1,11 @@
+# Copy to vault.yml and encrypt it before it ever touches disk unencrypted:
+#   cp vault.yml.example vault.yml   (fill in real values first)
+#   ansible-vault encrypt vault.yml
+# Run the playbook with --ask-vault-pass or --vault-password-file.
+---
+vault_db_user: contoso
+vault_db_password: CHANGE_ME
+vault_db_host: contoso.xxxxxxxxxx.us-east-1.rds.amazonaws.com
+vault_db_name: contoso
+vault_jwt_secret_key: CHANGE_ME_LONG_RANDOM_STRING
+vault_google_api_key: ""

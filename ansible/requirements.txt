@@ -1,0 +1,5 @@
+# Python deps for the amazon.aws collection modules used by provision.yml.
+# Install on the control node (your laptop/CI runner), not the EC2 instance:
+#   pip install -r requirements.txt
+boto3>=1.34
+botocore>=1.34

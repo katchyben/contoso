@@ -1,0 +1,12 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen: reload systemd
+
+- name: Restart backend
+  ansible.builtin.systemd:
+    name: contoso-backend
+    state: restarted
+    enabled: true
+  listen: restart backend

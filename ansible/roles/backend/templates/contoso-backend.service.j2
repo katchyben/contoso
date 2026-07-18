@@ -1,0 +1,21 @@
+# Managed by Ansible (roles/backend) — do not edit by hand.
+[Unit]
+Description=Contoso FastAPI backend
+After=network.target
+
+[Service]
+Type=exec
+User={{ app_user }}
+Group={{ app_group }}
+WorkingDirectory={{ app_dir }}/backend
+ExecStart=/usr/local/bin/uv run --project {{ app_dir }}/backend uvicorn app.main:app --host 127.0.0.1 --port {{ backend_port }} --workers {{ backend_workers }}
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths={{ app_dir }}/backend
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,72 @@
+# Managed by Ansible (roles/nginx) — do not edit by hand.
+#
+# TLS bootstrapping is two-phase and the role handles it automatically:
+# with enable_tls=true but no cert on disk yet, port 80 only serves the
+# acme-challenge + a redirect (tls_cert_ready is false, so no 443 block
+# below references the not-yet-existing cert). Once certbot obtains the
+# cert, the role re-renders this file with tls_cert_ready=true to add it.
+
+server {
+    listen 80;
+    server_name {{ domain_name }};
+
+{% if enable_tls %}
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+{% else %}
+    root {{ app_dir }}/frontend/dist;
+    index index.html;
+    client_max_body_size 10m;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:{{ backend_port }}/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+
+    location / {
+        try_files $uri /index.html;
+    }
+{% endif %}
+}
+
+{% if tls_cert_ready | default(false) %}
+server {
+    listen 443 ssl;
+    server_name {{ domain_name }};
+
+    ssl_certificate /etc/letsencrypt/live/{{ domain_name }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ domain_name }}/privkey.pem;
+
+    root {{ app_dir }}/frontend/dist;
+    index index.html;
+    client_max_body_size 10m;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:{{ backend_port }}/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+
+    location / {
+        try_files $uri /index.html;
+    }
+}
+{% endif %}

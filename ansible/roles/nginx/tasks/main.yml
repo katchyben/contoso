@@ -1,0 +1,87 @@
+---
+- name: Install nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Remove the default nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx
+
+- name: Install the websocket upgrade map (shared http-context snippet)
+  ansible.builtin.template:
+    src: upgrade-map.conf.j2
+    dest: /etc/nginx/conf.d/upgrade-map.conf
+    mode: "0644"
+  notify: reload nginx
+
+- name: Ensure the certbot webroot directory exists
+  ansible.builtin.file:
+    path: /var/www/certbot
+    state: directory
+    mode: "0755"
+  when: enable_tls
+
+- name: Check for an existing Let's Encrypt cert
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ domain_name }}/fullchain.pem"
+  register: le_cert
+  when: enable_tls
+
+- name: Render the site config (443 block only appears once a cert exists)
+  ansible.builtin.template:
+    src: contoso.conf.j2
+    dest: /etc/nginx/sites-available/contoso.conf
+    mode: "0644"
+  vars:
+    tls_cert_ready: "{{ enable_tls and (le_cert.stat.exists | default(false)) }}"
+  notify: reload nginx
+
+- name: Enable the contoso site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/contoso.conf
+    dest: /etc/nginx/sites-enabled/contoso.conf
+    state: link
+  notify: reload nginx
+
+- name: Install certbot
+  ansible.builtin.apt:
+    name:
+      - certbot
+      - python3-certbot-nginx
+    state: present
+  when: enable_tls
+
+# nginx must already be serving the acme-challenge location (from the render
+# above) before certbot's HTTP-01 check runs, so flush now rather than at
+# end-of-play.
+- name: Apply the pending nginx config before requesting a cert
+  ansible.builtin.meta: flush_handlers
+
+- name: Obtain a Let's Encrypt cert via the HTTP-01 webroot challenge
+  ansible.builtin.command: >
+    certbot certonly --webroot -w /var/www/certbot
+    -d {{ domain_name }} --non-interactive --agree-tos -m {{ letsencrypt_email }}
+  when: enable_tls and not le_cert.stat.exists
+  register: certbot_run
+  changed_when: true
+
+- name: Re-render the site config now that the cert exists, adding the 443 block
+  ansible.builtin.template:
+    src: contoso.conf.j2
+    dest: /etc/nginx/sites-available/contoso.conf
+    mode: "0644"
+  vars:
+    tls_cert_ready: true
+  when: enable_tls and certbot_run is changed
+  notify: reload nginx
+
+- name: Ensure nginx is enabled and running
+  ansible.builtin.systemd:
+    name: nginx
+    enabled: true
+    state: started

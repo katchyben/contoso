@@ -1,0 +1,82 @@
+---
+- name: Install base packages
+  ansible.builtin.apt:
+    name:
+      - git
+      - curl
+      - ca-certificates
+      - ufw
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create app group
+  ansible.builtin.group:
+    name: "{{ app_group }}"
+    system: true
+
+- name: Create app user
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    group: "{{ app_group }}"
+    system: true
+    create_home: true
+    shell: /usr/sbin/nologin
+
+- name: Create the app user's .ssh directory
+  ansible.builtin.file:
+    path: "/home/{{ app_user }}/.ssh"
+    state: directory
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0700"
+
+- name: Deploy git SSH key for private repo access
+  ansible.builtin.copy:
+    src: "{{ git_ssh_key_src }}"
+    dest: "/home/{{ app_user }}/.ssh/id_ed25519"
+    owner: "{{ app_user }}"
+    group: "{{ app_group }}"
+    mode: "0600"
+  when: git_ssh_key_src | length > 0
+
+- name: Trust GitHub's host key (only needed when using a git@github.com remote)
+  ansible.builtin.known_hosts:
+    name: github.com
+    key: "{{ lookup('pipe', 'ssh-keyscan -t ed25519 github.com') }}"
+    path: "/home/{{ app_user }}/.ssh/known_hosts"
+  become: true
+  become_user: "{{ app_user }}"
+  when: repo_url is search('github.com')
+
+- name: Clone or update the app repo
+  ansible.builtin.git:
+    repo: "{{ repo_url }}"
+    dest: "{{ app_dir }}"
+    version: "{{ repo_version }}"
+    accept_hostkey: true
+  become: true
+  become_user: "{{ app_user }}"
+  notify:
+    - restart backend
+
+- name: Allow app_dir to be traversed by other services (nginx reads frontend/dist)
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    mode: "0755"
+
+- name: Configure ufw defaults
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+
+- name: Allow SSH/HTTP/HTTPS through ufw
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "22"
+    - "80"
+    - "443"

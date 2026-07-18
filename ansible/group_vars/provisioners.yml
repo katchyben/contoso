@@ -1,0 +1,28 @@
+---
+# AWS auth: leave aws_profile empty to use the default credential chain
+# (env vars AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_SESSION_TOKEN, or
+# ~/.aws/credentials). Set it if you use a named profile instead.
+aws_profile: ""
+aws_region: us-east-1
+
+project_name: contoso
+instance_type: t3.small
+root_volume_size_gb: 20
+
+# Must already exist in this AWS account/region (EC2 → Key Pairs) — Ansible
+# won't create one, since that's the only way to get the .pem back safely.
+key_name: contoso-prod
+ssh_private_key_file: "~/.ssh/{{ key_name }}.pem"
+ssh_user: ubuntu
+
+# CHANGE THIS before running provision.yml. Never leave SSH open to
+# 0.0.0.0/0 — restrict it to your own IP (or office/VPN CIDR).
+# Find yours with: curl -s https://checkip.amazonaws.com
+admin_cidr: "203.0.113.10/32"
+
+# Leave blank to use the account's default VPC/subnet.
+vpc_id: ""
+vpc_subnet_id: ""
+
+ami_owner: "099720109477" # Canonical
+ami_name_filter: "ubuntu/images/hvm-ssd*/ubuntu-noble-24.04-amd64-server-*"

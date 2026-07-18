@@ -1,0 +1,6 @@
+---
+- name: Provision the EC2 instance + security group for Contoso
+  hosts: provisioners
+  gather_facts: false
+  roles:
+    - provision

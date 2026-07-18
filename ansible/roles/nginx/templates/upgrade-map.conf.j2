@@ -1,0 +1,6 @@
+# Managed by Ansible (roles/nginx) — required so the /api/ws/chat websocket
+# proxy in contoso.conf gets a real "Connection: upgrade" header.
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}

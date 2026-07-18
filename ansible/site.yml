@@ -1,0 +1,9 @@
+---
+- name: Configure Contoso backend + frontend on EC2
+  hosts: web
+  become: true
+  roles:
+    - common
+    - backend
+    - frontend
+    - nginx
