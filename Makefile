@@ -1,7 +1,10 @@
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 E2E_DIR := e2e
+K8S_DIR := k8s
 DOCKER_DB_URL := postgresql+psycopg://postgres:postgres@localhost:5433/contoso
+KIND_CLUSTER ?= kind
+DESKTOP_K8S_NODE ?= desktop-control-plane
 
 .DEFAULT_GOAL := help
 
@@ -9,7 +12,8 @@ DOCKER_DB_URL := postgresql+psycopg://postgres:postgres@localhost:5433/contoso
 	install install-backend install-frontend install-e2e \
 	dev-backend dev-frontend \
 	up down restart logs seed \
-	test test-backend test-e2e typecheck clean
+	test test-backend test-e2e typecheck clean \
+	k8s-build k8s-load k8s-up k8s-down k8s-restart k8s-status
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -60,3 +64,37 @@ typecheck: ## Type-check the frontend
 clean: ## Remove Python bytecode and pytest caches
 	find $(BACKEND_DIR) -type d -name "__pycache__" -not -path "*/.venv/*" -exec rm -rf {} +
 	rm -rf $(BACKEND_DIR)/.pytest_cache $(E2E_DIR)/.pytest_cache
+
+k8s-build: ## Build backend/frontend images for local k8s (contoso-backend:local, contoso-frontend:local)
+	docker build -t contoso-backend:local $(BACKEND_DIR)
+	docker build -t contoso-frontend:local $(FRONTEND_DIR)
+
+k8s-load: k8s-build ## Load images into your local cluster (auto-detects minikube, kind, or Docker Desktop)
+	@case "$$(kubectl config current-context)" in \
+		minikube*) \
+			minikube image load contoso-backend:local; \
+			minikube image load contoso-frontend:local ;; \
+		kind-*) \
+			kind load docker-image contoso-backend:local --name $(KIND_CLUSTER); \
+			kind load docker-image contoso-frontend:local --name $(KIND_CLUSTER) ;; \
+		docker-desktop) \
+			docker save contoso-backend:local | docker exec -i $(DESKTOP_K8S_NODE) ctr -n=k8s.io images import -; \
+			docker save contoso-frontend:local | docker exec -i $(DESKTOP_K8S_NODE) ctr -n=k8s.io images import - ;; \
+		*) \
+			echo "Unrecognized kubectl context '$$(kubectl config current-context)' (expected minikube, kind-*, or docker-desktop); see $(K8S_DIR)/README.md"; \
+			exit 1 ;; \
+	esac
+
+k8s-up: k8s-load ## Build, load, and apply the full k8s stack (see k8s/README.md)
+	kubectl apply -f $(K8S_DIR)/namespace.yaml
+	kubectl apply -f $(K8S_DIR)/configmap.yaml -f $(K8S_DIR)/secret.yaml
+	kubectl apply -f $(K8S_DIR)/db.yaml -f $(K8S_DIR)/minio.yaml -f $(K8S_DIR)/backend.yaml -f $(K8S_DIR)/frontend.yaml
+
+k8s-down: ## Tear down the local k8s stack (deletes the contoso namespace)
+	kubectl delete namespace contoso --ignore-not-found
+
+k8s-restart: k8s-load ## Rebuild + reload images, then rolling-restart backend/frontend deployments
+	kubectl -n contoso rollout restart deployment/backend deployment/frontend
+
+k8s-status: ## Show pod status in the contoso namespace
+	kubectl -n contoso get pods

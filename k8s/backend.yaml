@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: contoso
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      # Local-cluster only: image is built and loaded into the cluster's
+      # own image store (minikube image load / kind load docker-image),
+      # never pulled from a registry. See k8s/README.md.
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z db 5432; do echo waiting for db; sleep 2; done"]
+        - name: wait-for-minio
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z minio 9000; do echo waiting for minio; sleep 2; done"]
+      containers:
+        - name: backend
+          image: contoso-backend:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: contoso-config
+            - secretRef:
+                name: contoso-secrets
+          readinessProbe:
+            httpGet:
+              path: /openapi.json
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /openapi.json
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: contoso
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8000
+      targetPort: 8000

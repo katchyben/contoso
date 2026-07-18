@@ -72,6 +72,12 @@ Build:
 cd frontend && npm run build
 ```
 
+## Kubernetes (`k8s/`)
+
+Plain YAML manifests for running the full stack (Postgres, MinIO, backend, frontend) on a local cluster (minikube or kind) — this is the active, documented deployment path for local use. See `k8s/README.md` for build/load/apply/access steps.
+
+`ansible/` (EC2 provisioning + native install) still exists in the repo but is no longer the recommended path — left in place, untouched, superseded by `k8s/` for local use.
+
 ## Architecture
 
 Both apps are minimal starters, not yet split into further submodules:
