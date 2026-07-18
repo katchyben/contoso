@@ -8,7 +8,13 @@ import ListAltOutlined from '@mui/icons-material/ListAltOutlined'
 import PaymentsOutlined from '@mui/icons-material/PaymentsOutlined'
 import LocalShippingOutlined from '@mui/icons-material/LocalShippingOutlined'
 
-export type FieldType = 'string' | 'number' | 'decimal' | 'boolean' | 'enum' | 'datetime'
+export type FieldType = 'string' | 'number' | 'decimal' | 'boolean' | 'enum' | 'datetime' | 'reference'
+
+export interface ReferenceConfig {
+  // Resource path to fetch options from, and which field on those records to display.
+  path: string
+  labelKey: string
+}
 
 export interface FieldConfig {
   key: string
@@ -17,6 +23,9 @@ export interface FieldConfig {
   required?: boolean
   options?: string[]
   default?: unknown
+  reference?: ReferenceConfig
+  // Renders an image upload/preview control instead of a plain text input.
+  image?: boolean
   // Whether the field appears on the create / edit form. Mirrors the backend's
   // Create/Update pydantic schemas in backend/schemas.py exactly, since PATCH
   // to a field the Update schema doesn't accept is silently dropped server-side.
@@ -88,7 +97,12 @@ export const resources: ResourceConfig[] = [
     fields: [
       readOnly('id', 'ID'),
       { key: 'name', label: 'Name', type: 'string', required: true },
-      { key: 'parent_id', label: 'Parent category ID', type: 'number' },
+      {
+        key: 'parent_id',
+        label: 'Parent category',
+        type: 'reference',
+        reference: { path: '/categories', labelKey: 'name' },
+      },
     ],
   },
   {
@@ -104,7 +118,7 @@ export const resources: ResourceConfig[] = [
       { key: 'unit_price', label: 'Unit price', type: 'decimal', required: true },
       { key: 'stock_quantity', label: 'Stock quantity', type: 'number', default: 0 },
       { key: 'is_active', label: 'Active', type: 'boolean', default: true },
-      { key: 'image_url', label: 'Image URL', type: 'string' },
+      { key: 'image_url', label: 'Image', type: 'string', image: true },
       { key: 'category_id', label: 'Category ID', type: 'number' },
     ],
   },
@@ -152,7 +166,14 @@ export const resources: ResourceConfig[] = [
     fields: [
       readOnly('id', 'ID'),
       { key: 'order_id', label: 'Order ID', type: 'number', required: true, showOnEdit: false },
-      { key: 'product_id', label: 'Product ID', type: 'number', required: true, showOnEdit: false },
+      {
+        key: 'product_id',
+        label: 'Product',
+        type: 'reference',
+        reference: { path: '/products', labelKey: 'name' },
+        required: true,
+        showOnEdit: false,
+      },
       { key: 'quantity', label: 'Quantity', type: 'number', required: true },
       { key: 'unit_price', label: 'Unit price', type: 'decimal', required: true },
       { key: 'total_price', label: 'Total price', type: 'decimal', required: true },

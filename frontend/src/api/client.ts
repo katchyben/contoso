@@ -38,6 +38,31 @@ export const api = {
     request<void>(`${path}/${id}`, { method: 'DELETE' }),
 }
 
+export async function uploadImage(file: File): Promise<string> {
+  const token = getToken()
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const res = await fetch(`${API_BASE}/uploads`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: formData,
+  })
+
+  if (res.status === 401) {
+    clearToken()
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null)
+    const detail = typeof body?.detail === 'string' ? body.detail : `Upload failed (${res.status})`
+    throw new Error(detail)
+  }
+
+  const data = await res.json()
+  return data.url as string
+}
+
 export interface CurrentUser {
   id: number
   email: string

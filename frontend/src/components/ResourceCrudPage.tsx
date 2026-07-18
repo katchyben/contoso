@@ -28,7 +28,8 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
-import { api } from '../api/client'
+import UploadIcon from '@mui/icons-material/UploadOutlined'
+import { api, uploadImage } from '../api/client'
 import type { FieldConfig, ResourceConfig } from '../config/resources'
 import { styleForStatus } from '../config/statusStyles'
 import { useAuth } from '../auth/AuthContext'
@@ -69,9 +70,24 @@ function toDatetimeLocal(value: unknown): string {
   return value.slice(0, 16)
 }
 
-function formatCell(field: FieldConfig, value: unknown): ReactNode {
+function formatCell(field: FieldConfig, value: unknown, referenceOptions?: Row[]): ReactNode {
   if (value === null || value === undefined || value === '') {
     return <span style={{ opacity: 0.35 }}>—</span>
+  }
+  if (field.type === 'reference' && field.reference) {
+    const match = referenceOptions?.find((option) => option.id === value)
+    const label = match ? String(match[field.reference.labelKey]) : String(value)
+    return <span>{label}</span>
+  }
+  if (field.image) {
+    return (
+      <Box
+        component="img"
+        src={String(value)}
+        alt=""
+        sx={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 1, display: 'block' }}
+      />
+    )
   }
   if (field.type === 'boolean') {
     const style = value ? styleForStatus('paid') : styleForStatus('refunded')
@@ -124,7 +140,7 @@ function buildPayload(fields: FieldConfig[], mode: DialogMode, formState: Record
   for (const field of fieldsFor(fields, mode)) {
     const raw = formState[field.key]
     if (raw === '' && !field.required) continue
-    if (field.type === 'number') {
+    if (field.type === 'number' || field.type === 'reference') {
       payload[field.key] = raw === '' ? null : Number(raw)
     } else {
       payload[field.key] = raw
@@ -139,6 +155,7 @@ export function ResourceCrudPage({ resource }: { resource: ResourceConfig }) {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [referenceData, setReferenceData] = useState<Record<string, Row[]>>({})
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogMode, setDialogMode] = useState<DialogMode>('create')
@@ -146,6 +163,7 @@ export function ResourceCrudPage({ resource }: { resource: ResourceConfig }) {
   const [formState, setFormState] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [uploadingField, setUploadingField] = useState<string | null>(null)
 
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -165,6 +183,24 @@ export function ResourceCrudPage({ resource }: { resource: ResourceConfig }) {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    const referencePaths = [
+      ...new Set(resource.fields.filter((f) => f.type === 'reference' && f.reference).map((f) => f.reference!.path)),
+    ]
+    if (referencePaths.length === 0) {
+      setReferenceData({})
+      return
+    }
+    let cancelled = false
+    Promise.all(referencePaths.map((path) => api.list<Row>(path))).then((results) => {
+      if (cancelled) return
+      setReferenceData(Object.fromEntries(referencePaths.map((path, i) => [path, results[i]])))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [resource.fields])
 
   const openCreate = () => {
     setDialogMode('create')
@@ -189,6 +225,19 @@ export function ResourceCrudPage({ resource }: { resource: ResourceConfig }) {
 
   const handleFieldChange = (key: string, value: unknown) => {
     setFormState((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleImageUpload = async (key: string, file: File) => {
+    setUploadingField(key)
+    setFormError(null)
+    try {
+      const url = await uploadImage(file)
+      handleFieldChange(key, url)
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploadingField(null)
+    }
   }
 
   const handleSubmit = async () => {
@@ -291,7 +340,9 @@ export function ResourceCrudPage({ resource }: { resource: ResourceConfig }) {
                   }}
                 >
                   {resource.fields.map((field) => (
-                    <TableCell key={field.key}>{formatCell(field, row[field.key])}</TableCell>
+                    <TableCell key={field.key}>
+                      {formatCell(field, row[field.key], field.reference && referenceData[field.reference.path])}
+                    </TableCell>
                   ))}
                   <TableCell align="right">
                     <IconButton size="small" onClick={() => openEdit(row)} aria-label="edit">
@@ -332,6 +383,81 @@ export function ResourceCrudPage({ resource }: { resource: ResourceConfig }) {
                     }
                     label={field.label}
                   />
+                )
+              }
+
+              if (field.image) {
+                const isUploading = uploadingField === field.key
+                return (
+                  <Stack key={field.key} direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                    {value ? (
+                      <Box
+                        component="img"
+                        src={String(value)}
+                        alt=""
+                        sx={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 1, flexShrink: 0 }}
+                      />
+                    ) : (
+                      <Box
+                        sx={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 1,
+                          flexShrink: 0,
+                          border: '1px dashed',
+                          borderColor: 'divider',
+                        }}
+                      />
+                    )}
+                    <TextField
+                      label={field.label}
+                      value={value ?? ''}
+                      required={field.required}
+                      onChange={(e) => handleFieldChange(field.key, e.target.value)}
+                      fullWidth
+                    />
+                    <Button
+                      component="label"
+                      variant="outlined"
+                      startIcon={isUploading ? <CircularProgress size={16} /> : <UploadIcon />}
+                      disabled={isUploading}
+                      sx={{ flexShrink: 0 }}
+                    >
+                      Upload
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          e.target.value = ''
+                          if (file) void handleImageUpload(field.key, file)
+                        }}
+                      />
+                    </Button>
+                  </Stack>
+                )
+              }
+
+              if (field.type === 'reference' && field.reference) {
+                const options = referenceData[field.reference.path] ?? []
+                return (
+                  <TextField
+                    key={field.key}
+                    select
+                    label={field.label}
+                    value={value ?? ''}
+                    required={field.required}
+                    onChange={(e) => handleFieldChange(field.key, e.target.value === '' ? '' : Number(e.target.value))}
+                    fullWidth
+                  >
+                    {!field.required && <MenuItem value="">{'—'}</MenuItem>}
+                    {options.map((option) => (
+                      <MenuItem key={String(option.id)} value={option.id as number}>
+                        {String(option[field.reference!.labelKey])}
+                      </MenuItem>
+                    ))}
+                  </TextField>
                 )
               }
 

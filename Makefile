@@ -11,7 +11,7 @@ DESKTOP_K8S_NODE ?= desktop-control-plane
 .PHONY: help \
 	install install-backend install-frontend install-e2e \
 	dev-backend dev-frontend \
-	up down restart logs seed \
+	up down restart start logs seed \
 	test test-backend test-e2e typecheck clean \
 	k8s-build k8s-load k8s-up k8s-down k8s-restart k8s-status
 
@@ -43,6 +43,10 @@ down: ## Stop the docker compose stack
 
 restart: ## Restart the docker compose stack
 	docker compose restart
+
+start: ## Fresh start: tear down the docker compose stack + volumes, then bring it back up
+	docker compose down -v
+	docker compose up -d
 
 logs: ## Tail logs from the docker compose stack
 	docker compose logs -f

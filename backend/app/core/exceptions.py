@@ -28,3 +28,7 @@ class UnauthorizedError(DomainError):
 class ForbiddenError(DomainError):
     def __init__(self, message: str = "Not enough permissions"):
         super().__init__(message)
+
+
+class ValidationError(DomainError):
+    pass
