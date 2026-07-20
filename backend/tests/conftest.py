@@ -1,7 +1,6 @@
 import os
 
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-pytest-do-not-use")
-os.environ.setdefault("GOOGLE_API_KEY", "test-google-api-key")
 
 import pytest
 from fastapi.testclient import TestClient

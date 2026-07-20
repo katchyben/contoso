@@ -41,7 +41,7 @@ def test_chat_ws_round_trip_returns_llm_reply(client, make_customer, issue_token
     token = issue_token(user)
 
     with patch(
-        "app.services.chat_service.ChatGoogleGenerativeAI.invoke",
+        "app.services.chat_service.ChatOllama.invoke",
         return_value=AIMessage(content="We have that in stock!"),
     ):
         with client.websocket_connect(f"/ws/chat?token={token}") as ws:
@@ -56,7 +56,7 @@ def test_chat_ws_falls_back_gracefully_when_llm_call_fails(client, make_customer
     token = issue_token(user)
 
     with patch(
-        "app.services.chat_service.ChatGoogleGenerativeAI.invoke",
+        "app.services.chat_service.ChatOllama.invoke",
         side_effect=RuntimeError("upstream is down"),
     ):
         with client.websocket_connect(f"/ws/chat?token={token}") as ws:

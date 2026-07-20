@@ -29,6 +29,20 @@ spec:
       containers:
         - name: db
           image: postgres:16-alpine
+          args:
+            - "-c"
+            - "shared_buffers=512MB"
+            - "-c"
+            - "work_mem=16MB"
+            - "-c"
+            - "max_connections=200"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
           ports:
             - containerPort: 5432
           env:

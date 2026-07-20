@@ -1,7 +1,7 @@
 import os
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_ollama import ChatOllama
 from sqlmodel import Session
 
 from app import models
@@ -29,14 +29,14 @@ Product catalog (name, SKU, price, stock):
 
 
 class ChatService:
-    """Answers customer chat questions using product/order context grounded via Gemini."""
+    """Answers customer chat questions using product/order context grounded via Ollama."""
 
     def __init__(self, session: Session):
         self.product_repository = Repository(session, models.Product)
         self.order_repository = OrderRepository(session)
-        self._llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-flash",
-            api_key=os.environ["GOOGLE_API_KEY"],
+        self._llm = ChatOllama(
+            model=os.environ.get("OLLAMA_MODEL", "mistral"),
+            base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
         )
 
     def _build_system_message(self, customer: models.Customer) -> SystemMessage:

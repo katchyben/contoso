@@ -24,7 +24,9 @@ Listens on `http://127.0.0.1:8000` by default. `test_main.http` contains sample 
 
 CORS is enabled for any `http://localhost:<port>` / `http://127.0.0.1:<port>` origin (see `allow_origin_regex` in `main.py`), so the frontend dev server can call it regardless of which port Vite picks.
 
-Config is loaded from `backend/.env` (via `python-dotenv`, wired up in `app/__init__.py`); see `backend/.env.example` for the variables it reads (`DATABASE_URL`, `JWT_SECRET_KEY`, `GOOGLE_API_KEY`).
+Config is loaded from `backend/.env` (via `python-dotenv`, wired up in `app/__init__.py`); see `backend/.env.example` for the variables it reads (`DATABASE_URL`, `JWT_SECRET_KEY`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL`).
+
+The customer support chatbot (`app/services/chat_service.py`) is grounded via a local Ollama model (`mistral` by default, no API key needed) rather than a hosted LLM API — see `OLLAMA_BASE_URL`/`OLLAMA_MODEL` above. Ollama runs natively on the host (not as a docker-compose service or k8s pod); pull the model once with `ollama pull mistral` before expecting real replies — until then `ChatService` falls back to a canned message. docker-compose and k8s point `OLLAMA_BASE_URL` at `http://host.docker.internal:11434` to reach this same host-installed Ollama.
 
 Backend has a pytest suite (`backend/tests/`) covering services, repositories, and routers (incl. the `/ws/chat` websocket) against an in-memory SQLite DB — no external services needed:
 ```
@@ -44,7 +46,7 @@ cd e2e && uv sync && uv run playwright install chromium          # one-time setu
 uv run pytest
 ```
 
-Tests assume the seeded fixture logins from `backend/seed.py` (`ada.lovelace@example.com` / `customer123`, `admin@contoso.local` / `admin123`). The chat widget test tolerates either a real Gemini reply or the graceful fallback message — it doesn't require a working `GOOGLE_API_KEY`, since it only asserts that *some* assistant reply arrives.
+Tests assume the seeded fixture logins from `backend/seed.py` (`ada.lovelace@example.com` / `customer123`, `admin@contoso.local` / `admin123`). The chat widget test tolerates either a real Ollama reply or the graceful fallback message — it doesn't require the model to be pulled, since it only asserts that *some* assistant reply arrives.
 
 If you've changed `backend/pyproject.toml` since the backend container was last built, its `.venv` (an anonymous Docker volume, isolated from `backend/.venv` on the host) can go stale and crash-loop on missing imports. Fix with `docker compose exec backend uv sync --locked` followed by `docker compose restart backend`, or `docker compose build backend` if you have registry access.
 

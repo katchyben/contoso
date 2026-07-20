@@ -70,7 +70,7 @@ def test_reply_sends_history_as_typed_messages_and_returns_llm_content(session, 
         captured["messages"] = messages
         return AIMessage(content="Here is my answer.")
 
-    with patch("app.services.chat_service.ChatGoogleGenerativeAI.invoke", new=fake_invoke):
+    with patch("app.services.chat_service.ChatOllama.invoke", new=fake_invoke):
         reply = service.reply(
             customer,
             [

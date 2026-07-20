@@ -1,16 +1,20 @@
 # Kubernetes (local)
 
-Plain-YAML manifests for running the full stack (Postgres, MinIO, backend, frontend)
-on a local cluster (minikube, kind, or Docker Desktop's built-in Kubernetes). This is
-the local dev/testing path only — it does not provision or target any cloud cluster.
+Plain-YAML manifests for running the full stack (Postgres, MinIO, backend,
+frontend) on a local cluster (minikube, kind, or Docker Desktop's built-in
+Kubernetes). This is the local dev/testing path only — it does not provision or
+target any cloud cluster.
+
+The chatbot (`ChatService`) talks to Ollama running natively on your host
+machine, not a pod in the cluster — see Chatbot model below.
 
 ## Quickstart (make)
 
 ```
-make k8s-up       # build images, load into your cluster (auto-detects minikube/kind/docker-desktop), apply manifests
-make k8s-status   # check pod status
-make k8s-restart  # rebuild + reload images, rolling-restart backend/frontend after a code change
-make k8s-down     # tear down (deletes the contoso namespace)
+make k8s-up          # build images, load into your cluster (auto-detects minikube/kind/docker-desktop), apply manifests
+make k8s-status      # check pod status
+make k8s-restart     # rebuild + reload images, rolling-restart backend/frontend after a code change
+make k8s-down        # tear down (deletes the contoso namespace)
 ```
 
 `k8s-load`/`k8s-up`/`k8s-restart` detect the cluster type from `kubectl config
@@ -64,6 +68,25 @@ Watch rollout:
 ```
 kubectl -n contoso get pods -w
 ```
+
+## Chatbot model (Ollama)
+
+The customer-support chatbot (`ChatService`) talks to Ollama running natively on
+your host machine (not a pod) — no API key needed, but the model has to be
+pulled once before the first chat message will get a real reply (until then,
+`ChatService` falls back to a canned "having trouble answering" message):
+
+```
+ollama pull mistral
+```
+
+`k8s/configmap.yaml` points `OLLAMA_BASE_URL` at `http://host.docker.internal:11434`,
+which Docker Desktop's Kubernetes resolves back to your host — so the backend pod
+reaches whatever Ollama server you already have running locally. If you're on
+minikube or kind instead, swap that value for `http://host.minikube.internal:11434`
+or a `hostAliases` entry pointing at your Docker network's gateway IP, respectively.
+Change the model by editing `OLLAMA_MODEL` in `k8s/configmap.yaml` and pulling the
+new one natively.
 
 ## Access
 
